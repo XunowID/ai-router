@@ -1,34 +1,32 @@
 # ⚡ ai-router — Universal AI API Router
 
-**Gabungan inovasi: Free AI Access + Smart Routing.**
-
-Satu file Python, zero dependency, bisa pake AI gratis dari berbagai provider tanpa ribet. Auto-fallback kalau kena rate limit.
+**Combine free AI access with smart routing.**  
+Single Python file, zero dependencies, auto-fallback across multiple providers.
 
 ---
 
-## 🚀 Cara Pake
+## 🚀 Quick Start
 
-### 1. Setup API Key
+### 1. Get API Keys
 
-Bikin file `.env` di folder yang sama:
+Create a `.env` file:
 
 ```env
-# Daftar gratis di masing-masing provider, bebas pilih salah satu/beberapa
-GROQ_API_KEY=gsk_xxx          → groq.com (free, fast)
-GEMINI_API_KEY=AIzaxxx         → aistudio.google.com (free tier paling generous)
+GROQ_API_KEY=gsk_xxx          → groq.com (free, blazing fast)
+GEMINI_API_KEY=AIzaxxx         → aistudio.google.com (most generous free tier)
 DEEPSEEK_API_KEY=sk-xxx       → platform.deepseek.com
-TOGETHER_API_KEY=xxx           → together.ai ($25 credit gratis)
+TOGETHER_API_KEY=xxx           → together.ai ($25 free credit)
 HF_API_KEY=hf_xxx              → huggingface.co (free inference)
 ```
 
-**Minimal 1 aja udah cukup.** Makin banyak makin bagus buat fallback.
+**One key is enough.** More keys = better fallback coverage.
 
 ### 2. CLI Mode
 
 ```bash
-python ai_router.py "cara bikin nasi goreng enak"
-python ai_router.py --prefer groq "apa itu AI?"
-python ai_router.py --providers   # cek status semua provider
+python ai_router.py "explain quantum computing in simple terms"
+python ai_router.py --prefer groq "what is AI?"
+python ai_router.py --providers   # check which APIs are configured
 ```
 
 ### 3. Server Mode
@@ -38,35 +36,36 @@ python ai_router.py --serve
 # → http://localhost:8080
 ```
 
-Ada UI web sederhana. Bisa juga pake curl:
+Comes with a web UI. Also works with curl:
 
 ```bash
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "apa itu AI router?"}'
+  -d '{"prompt": "what is an AI router?"}'
 ```
 
 ---
 
-## 🔧 Cara Kerja
+## 🔧 How It Works
 
 ```
-Prompt kamu
+Your prompt
     ↓
-  ai-router → cek provider 1 (Gemini)  → ✅ berhasil → balik hasil
-              ↓ (gagal / rate limit)
-              cek provider 2 (Groq)     → ✅ berhasil → balik hasil
-              ↓ (gagal)
-              cek provider 3 (DeepSeek) → dst...
+  ai-router → try Gemini      → ✅ success → return result
+              ↓ (rate limited)
+              try Groq         → ✅ success → return result
+              ↓ (failed)
+              try DeepSeek     → continue...
 ```
 
-- **Prioritas otomatis:** coba provider yang API key-nya ada
-- **Auto-fallback:** kalau kena rate limit / quota habis, pindah provider berikutnya
-- **Zero dependency:** cuma pake std library Python, gak perlu `pip install`
+- **Auto-priority:** tries configured providers in smart order
+- **Auto-fallback:** on rate limit / quota exceeded, moves to next provider
+- **Zero dependencies:** pure Python standard library — no `pip install`
+- **Privacy-first:** your data goes directly to the provider, no middleman
 
 ---
 
-## 📦 File Size
+## 📦 Size
 
 | File | Size |
 |------|------|
@@ -76,17 +75,23 @@ Prompt kamu
 
 ---
 
-## 🎯 Kenapa Ini Keren
+## 🎯 Why This Exists
 
-- ✅ **Gratis** — pake free tier dari berbagai provider AI
-- ✅ **Ringan** — 1 file, bisa di-copy paste ke server mana aja
-- ✅ **Zero dep** — standar library Python aja cukup
-- ✅ **Auto fallback** — kalau satu lemot/error, pindah sendiri
-- ✅ **CLI + Web UI + API** — 3 mode dalam 1 file
-- ✅ **Privacy** — data ke provider langsung, gak lewat server pihak ketiga
+- ✅ **Free** — leverages free tiers of multiple AI providers
+- ✅ **Lightweight** — one file, copy-paste anywhere
+- ✅ **Zero deps** — Python stdlib only, works out of the box
+- ✅ **Auto fallback** — one provider down? Next one takes over
+- ✅ **3 modes** — CLI + Web UI + REST API in a single file
+- ✅ **Extensible** — add any OpenAI-compatible provider in 3 lines
+
+---
+
+## 🤝 Contributing
+
+PRs welcome! Add providers, improve routing, fix bugs — all contributions help.
 
 ---
 
 ## 📜 License
 
-MIT — bebas pake, bebas modif, bebas sebar.
+MIT — use it, modify it, share it. No strings attached.

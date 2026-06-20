@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
 ai-router — Universal AI API Router
-Inovasi: gabungan konsep free AI access + smart routing
-- Multi-provider dengan auto-fallback
-- CLI mode + API server mode
-- Ringan: 1 file, dependensi minimal
+Multi-provider with auto-fallback, CLI + API server, zero dependency (stdlib only).
 """
 
 from __future__ import annotations
@@ -17,19 +14,19 @@ from pathlib import Path
 
 
 # ─── Minimal HTTP ───────────────────────────────────────────────────
-# pake urllib biar zero dependency, gak perlu install apa-apa
+# stdlib only — no pip install needed
 
 try:
     import urllib.request as req_lib
     import urllib.error as url_err
 
     HAS_REQUESTS = True
-except ImportError:  # pragma: no cover
+except ImportError:
     HAS_REQUESTS = False
 
 
 def _req_json(url: str, data: dict | None = None, headers: dict | None = None) -> dict:
-    """HTTP request → JSON. Zero dependency."""
+    """HTTP request → JSON. Pure stdlib, zero dependencies."""
     hdrs = {"Content-Type": "application/json", **(headers or {})}
     body = json.dumps(data).encode() if data else None
     r = req_lib.Request(url, data=body, headers=hdrs, method="POST" if data else "GET")
@@ -43,7 +40,7 @@ def _req_json(url: str, data: dict | None = None, headers: dict | None = None) -
         return {"error": str(e)}
 
 
-# ─── Konfigurasi Provider ──────────────────────────────────────────
+# ─── Provider Config ────────────────────────────────────────────────
 
 
 @dataclass
@@ -124,47 +121,43 @@ def get_api_key(env_var: str) -> str | None:
 
 
 def ask_provider(provider: Provider, prompt: str) -> dict:
-    """Kirim prompt ke satu provider, return response."""
+    """Send prompt to a single provider, return raw response dict."""
     key = get_api_key(provider.api_key_env)
     if not key:
-        return {"error": f"❌ {provider.api_key_env} not set"}
+        return {"error": f"{provider.api_key_env} not set"}
 
     url = provider.url.format(model=provider.model)
     headers = provider.headers_fn(provider, key)
     body = provider.body_fn(provider, prompt, provider.model)
 
-    data = _req_json(url, data=body, headers=headers)
-    return data
+    return _req_json(url, data=body, headers=headers)
 
 
 def is_error(data: dict) -> str | None:
-    """Cek apakah response error. Return alasan atau None."""
+    """Check if response contains an error. Return reason string or None."""
     err = data.get("error")
     if not err:
         return None
     err_str = str(err).lower()
-    # cek kata kunci fallback
-    for p in PROVIDERS:
-        for kw in p.fallback_on:
-            if kw in err_str:
-                return str(err)
+    for kw in PROVIDERS[0].fallback_on:
+        if kw in err_str:
+            return str(err)
     return None
 
 
 def ai_route(prompt: str, prefer: str | None = None) -> str:
-    """Route prompt ke provider terbaik yang available."""
+    """Route prompt to the best available provider with auto-fallback."""
     if not HAS_REQUESTS:
-        return "[ERROR] urllib not available — this is impossible on Python stdlib."
+        return "[ERROR] Python stdlib urllib unavailable."
 
     if not prompt.strip():
-        return "[ERROR] Prompt kosong."
+        return "[ERROR] Empty prompt."
 
-    # Urutkan: preferensi pertama, sisanya berdasarkan urutan
+    # Order: preferred first (if set), then Gemini (most generous free tier), then others
     if prefer:
         ordered = [p for p in PROVIDERS if p.name.lower() == prefer.lower()]
         ordered += [p for p in PROVIDERS if p.name.lower() != prefer.lower()]
     else:
-        # Gemini first karena free tier paling generous
         ordered = sorted(PROVIDERS, key=lambda p: (p.name != "Gemini", p.name != "Groq"))
 
     for provider in ordered:
@@ -187,7 +180,11 @@ def ai_route(prompt: str, prefer: str | None = None) -> str:
 
         sys.stderr.write(f"⏭ skip (empty/unexpected)\n")
 
-    return "[ERROR] Semua provider gagal. Set API key di .env dulu.\nLihat README.md untuk cara setup."
+    return (
+        "[ERROR] All providers failed.\n"
+        "Set at least one API key in .env file.\n"
+        "See README.md for setup instructions."
+    )
 
 
 # ─── CLI ────────────────────────────────────────────────────────────
@@ -200,24 +197,24 @@ def cli_main():
         description="ai-router — Universal AI API Router",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Contoh:\n"
-            "  python ai_router.py \"cara bikin nasi goreng\"\n"
-            "  python ai_router.py --prefer groq \"apa itu AI?\"\n"
+            "Examples:\n"
+            "  python ai_router.py \"explain quantum computing in simple terms\"\n"
+            "  python ai_router.py --prefer groq \"what is AI?\"\n"
             "  python ai_router.py --serve\n"
             "  python ai_router.py --providers\n"
-            "\nEnv yang dibaca:\n"
+            "\nEnvironment variables:\n"
             "  GROQ_API_KEY | GEMINI_API_KEY | DEEPSEEK_API_KEY\n"
             "  TOGETHER_API_KEY | HF_API_KEY\n"
         ),
     )
-    parser.add_argument("prompt", nargs="?", help="Prompt buat AI")
-    parser.add_argument("--prefer", "-p", help="Prioritas provider (groq, gemini, dll)")
-    parser.add_argument("--serve", "-s", action="store_true", help="Jalankan sebagai API server")
-    parser.add_argument("--providers", action="store_true", help="List semua provider")
-    parser.add_argument("--port", type=int, default=8080, help="Port untuk server mode")
+    parser.add_argument("prompt", nargs="?", help="Your prompt for the AI")
+    parser.add_argument("--prefer", "-p", help="Preferred provider (groq, gemini, etc)")
+    parser.add_argument("--serve", "-s", action="store_true", help="Run as HTTP API server")
+    parser.add_argument("--providers", action="store_true", help="List all available providers and their status")
+    parser.add_argument("--port", type=int, default=8080, help="Port for server mode (default: 8080)")
     args = parser.parse_args()
 
-    # Load .env
+    # Load .env file if it exists
     env_path = Path(".env")
     if env_path.exists():
         for line in env_path.read_text().splitlines():
@@ -231,7 +228,7 @@ def cli_main():
         for p in PROVIDERS:
             key = get_api_key(p.api_key_env)
             status = "✅" if key else "❌ no key"
-            print(f"  {p.name:15s} {p.model:40s} {status}")
+            print(f"  {p.name:15s} {p.model:45s} {status}")
         return
 
     if args.serve:
@@ -249,7 +246,7 @@ def cli_main():
 
 
 def serve_mode(port: int):
-    """Simple HTTP server — zero dependency, pure stdlib."""
+    """Simple HTTP server — zero deps, pure Python stdlib."""
     from http.server import HTTPServer, BaseHTTPRequestHandler
 
     class RouterHandler(BaseHTTPRequestHandler):
@@ -306,8 +303,8 @@ button:hover{background:#2ea043}
 <div class="card">
 <h1>⚡ ai-router</h1>
 <p class="g">Universal AI API Router — multi-provider, auto-fallback</p>
-<textarea id="prompt" placeholder="Tulis prompt di sini ..."></textarea>
-<button onclick="ask()">Kirim →</button>
+<textarea id="prompt" placeholder="Type your prompt here ..."></textarea>
+<button onclick="ask()">Send →</button>
 <div id="res"></div>
 </div>
 <script>
@@ -327,8 +324,8 @@ const d=await r.json();res.textContent=d.response||d.error;}
 
     server = HTTPServer(("0.0.0.0", port), RouterHandler)
     print(f"⚡ ai-router server running on http://localhost:{port}")
-    print(f"   POST / — chat dengan AI")
-    print(f"   GET  /providers — cek status provider")
+    print(f"   POST / — chat with AI")
+    print(f"   GET  /providers — check provider status")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
